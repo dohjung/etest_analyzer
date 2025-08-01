@@ -1,0 +1,39 @@
+import pandas as pd
+import numpy as np
+import time
+import multiprocessing as mp
+import os
+
+# --- 1. Define the processing function to run in parallel ---
+# This function will be executed by each worker process.
+# It takes a single group (from the groupby result) as input.
+def process_group(group_tuple):
+    """
+    Returns:
+        tuple: The group name and a result string.
+    """
+    group_name, group_df = group_tuple
+    
+    time.sleep(1) 
+   
+    print(f"Processing group {group_name} with {len(group_df)} rows...")
+
+	parsed_df = parse_function(group_df)
+    group_df.to_csv(f'results/group_{group_name[0]}_{group_name[1]}.csv')
+    return summary
+
+
+# --- 2. Main execution block for the parallel process ---
+if __name__ == "__main__":
+    grouped_df = df.groupby(['a', 'b'])
+    groups_list = list(grouped_df)
+    
+	# Create a Pool of worker processes.
+    # It's generally best practice to let multiprocessing decide the number of workers.
+    # Using os.cpu_count() ensures you use all available cores.
+    with mp.Pool(os.cpu_count()) as pool:
+        # The pool.map() function applies the `process_group` function
+        # to every item in `groups_list`. The items are processed in parallel.
+        # It blocks until all processes are complete and returns a list of results.
+        results = pool.map(process_group, groups_list)
+    
