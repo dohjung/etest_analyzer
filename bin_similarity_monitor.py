@@ -308,15 +308,23 @@ def build_or_refresh_profiles(conn,
 # ============================================================
 
 def compute_similarity(df_pass: pd.DataFrame,
-                       profiles: dict) -> pd.DataFrame:
+                       profiles: dict,
+                       test_diff_set: set = None) -> pd.DataFrame:
     """
     Pass unit별 각 Fail bin과의 유사도 계산.
     유사도 = fail bin percentile 범위 내에 있는 feature 비율 (0~1).
 
+    Args:
+        test_diff_set: feature_filter에서 생성된 test_diff 집합.
+                       None이면 전체 feature 사용.
+
     Returns:
         DataFrame: 행=die_id, 열=sim_bin_{bin_id}
     """
-    logger.info("유사도 계산 시작")
+    if test_diff_set is not None:
+        logger.info(f"유사도 계산 시작 (test_diff 필터 적용: {len(test_diff_set)}개 feature)")
+    else:
+        logger.info("유사도 계산 시작 (전체 feature 사용)")
 
     try:
         df_pivot = df_pass.pivot_table(
@@ -339,6 +347,7 @@ def compute_similarity(df_pass: pd.DataFrame,
             common_features = [
                 f for f in bin_profile
                 if f in unit_values.index and pd.notna(unit_values[f])
+                and (test_diff_set is None or f in test_diff_set)
             ]
             if not common_features:
                 row[f'sim_bin_{bin_id}'] = np.nan
@@ -595,9 +604,13 @@ def run(target_date: str,
         logger.warning(f"{target_date} 데이터 없음 → 종료")
         return
 
-    # Step 3: 유사도 계산
+    # Step 3: 유사도 계산 (test_diff 필터 적용)
+    from feature_filter import classify_or_load, load_test_diff
+    diff_path = classify_or_load(conn, lookback_days=lookback_days, refresh_days=refresh_days)
+    test_diff_set = load_test_diff(diff_path) if diff_path else None
+
     df_meta = df_pass[['die_id', 'lot_id']].drop_duplicates()
-    df_sim  = compute_similarity(df_pass, profiles)
+    df_sim  = compute_similarity(df_pass, profiles, test_diff_set=test_diff_set)
 
     # Step 4: Lot 단위 집계
     agg = aggregate_similarity(df_sim, df_meta)
